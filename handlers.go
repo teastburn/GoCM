@@ -5,18 +5,45 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"log"
 )
 
-// Send a message to GCM
+// Send a message to GCM or APNS
 func send(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	tokens := r.PostForm["tokens"]
-	payload := r.PostFormValue("payload")
+	payloadAsString := r.PostFormValue("payload")
 
-	go func() {
-		incrementPending()
-		sendMessageToGCM(tokens, payload)
-	}()
+	if payloadAsString == "" {
+		errText := "Payload was empty, exiting"
+		log.Println(errText)
+		//return false, errors.New(errText)
+	}
+
+	// Unpack the JSON payload
+	var payload map[string]interface{}
+	err := json.Unmarshal([]byte(payloadAsString), &payload)
+	if err != nil {
+		log.Println("Can't unmarshal the json: " + err.Error())
+		log.Println("Original: " + payloadAsString)
+		//return false, err
+	}
+
+	log.Println("Original: " + payloadAsString)
+	if payload["aps"] != nil {
+		log.Println("Sending apns")
+		go func() {
+			incrementPending()
+			byteArray := []byte(payloadAsString)
+			sendMessageToAPNS(tokens, byteArray)
+		}()
+	} else {
+		log.Println("Sending gcm")
+		go func() {
+			incrementPending()
+			sendMessageToGCM(tokens, payload)
+		}()
+	}
 
 	// Return immediately
 	output := "ok\n"

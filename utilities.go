@@ -1,14 +1,15 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"log"
 
 	"github.com/alexjlockwood/gcm"
+	apns "github.com/sideshow/apns2"
+	"github.com/sideshow/apns2/certificate"
 )
 
-func sendMessageToGCM(tokens []string, payloadAsString string) (bool, error) {
+func sendMessageToGCM(tokens []string, payload map[string]interface{}) (bool, error) {
 	// At any exit, decrement pending
 	defer func() {
 		go decrementPending()
@@ -18,21 +19,6 @@ func sendMessageToGCM(tokens []string, payloadAsString string) (bool, error) {
 		errText := "No tokens were supplied, exiting"
 		log.Println(errText)
 		return false, errors.New(errText)
-	}
-
-	if payloadAsString == "" {
-		errText := "Payload was empty, exiting"
-		log.Println(errText)
-		return false, errors.New(errText)
-	}
-
-	// Unpack the JSON payload
-	var payload map[string]interface{}
-	err := json.Unmarshal([]byte(payloadAsString), &payload)
-	if err != nil {
-		log.Println("Can't unmarshal the json: " + err.Error())
-		log.Println("Original: " + payloadAsString)
-		return false, err
 	}
 
 	// All is well, make & send the message
@@ -77,6 +63,32 @@ func sendMessageToGCM(tokens []string, payloadAsString string) (bool, error) {
 
 	return true, nil
 }
+
+func sendMessageToAPNS(tokens []string, payloadAsString []byte) (bool, error) {
+	cert, pemErr := certificate.FromPemFile("conf/APNS2.pem", "")
+	if pemErr != nil {
+		log.Println("Cert Error:", pemErr)
+	}
+
+	notification := &apns.Notification{}
+	log.Println("token:", tokens[0])
+	notification.DeviceToken = tokens[0] // "11aa01229f15f0f0c52029d8cf8cd0aeaf2365fe4cebc4af26cd6d76b7919ef7"
+	notification.Topic = "com.life360.enterpriseqa"
+	notification.Payload = payloadAsString
+
+	//client := apns.NewClient(cert).Development()
+	client := apns.NewClient(cert).Production()
+	res, err := client.Push(notification)
+
+	if err != nil {
+		log.Println("Error:", err)
+		return false, err
+	}
+	log.Println("Res:", res)
+
+	return true, nil
+}
+
 
 func handleCanonicalsInResult(original string, results []gcm.Result) {
 	for _, r := range results {

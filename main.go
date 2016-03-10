@@ -86,7 +86,7 @@ func main() {
 	log.Println("Listening on " + listenAddress)
 
 	// Set up handlers
-	http.HandleFunc("/gcm/send", send)
+	http.HandleFunc("/send", send)
 	http.HandleFunc("/gcm/report", getReport)
 	http.HandleFunc("/gcm/report/canonical", getCanonicalReport)
 	http.HandleFunc("/gcm/report/notregistered", getNotRegisteredReport)
